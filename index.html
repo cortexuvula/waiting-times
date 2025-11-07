@@ -312,18 +312,18 @@
             document.querySelector('#step1 .btn').disabled = true;
 
             try {
-                // Check if it's a postal code (6 characters, alphanumeric)
-                const postalCodePattern = /^[A-Za-z]\d[A-Za-z]\s?\d[A-Za-z]\d$/;
-                const isPostalCode = postalCodePattern.test(address);
+                // Try to extract a postal code from anywhere in the input
+                const postalCodePattern = /[A-Za-z]\d[A-Za-z]\s?\d[A-Za-z]\d/;
+                const postalCodeMatch = address.match(postalCodePattern);
 
                 let representatives;
 
-                if (isPostalCode) {
-                    // Use postal code directly
-                    const cleanPostalCode = address.replace(/\s/g, '').toUpperCase();
+                if (postalCodeMatch) {
+                    // Use postal code if found (most accurate)
+                    const cleanPostalCode = postalCodeMatch[0].replace(/\s/g, '').toUpperCase();
                     representatives = await searchByPostalCode(cleanPostalCode);
                 } else {
-                    // Geocode the address first
+                    // Geocode the address if no postal code found
                     const coords = await geocodeAddress(address);
                     representatives = await searchByCoordinates(coords.lat, coords.lng);
                 }
@@ -360,14 +360,18 @@
         }
 
         async function searchByCoordinates(lat, lng) {
-            const response = await fetch(`https://represent.opennorth.ca/representatives/?point=${lat},${lng}&sets=british-columbia-legislature`);
+            const response = await fetch(`https://represent.opennorth.ca/representatives/?point=${lat},${lng}`);
 
             if (!response.ok) {
                 throw new Error('Could not find MLA for this location');
             }
 
             const data = await response.json();
-            return data.objects || [];
+            const allReps = data.objects || [];
+
+            // Filter for BC MLAs only (elected_office === "MLA")
+            const mlas = allReps.filter(rep => rep.elected_office === 'MLA');
+            return mlas;
         }
 
         async function geocodeAddress(address) {
