@@ -345,14 +345,18 @@
         }
 
         async function searchByPostalCode(postalCode) {
-            const response = await fetch(`https://represent.opennorth.ca/postcodes/${postalCode}/?sets=british-columbia-legislature`);
+            const response = await fetch(`https://represent.opennorth.ca/postcodes/${postalCode}/`);
 
             if (!response.ok) {
                 throw new Error('Could not find electoral district for this postal code');
             }
 
             const data = await response.json();
-            return data.representatives_centroid || data.representatives_concordance || [];
+            const allReps = data.representatives_centroid || data.representatives_concordance || [];
+
+            // Filter for BC MLAs only (elected_office === "MLA")
+            const mlas = allReps.filter(rep => rep.elected_office === 'MLA');
+            return mlas;
         }
 
         async function searchByCoordinates(lat, lng) {
@@ -392,9 +396,11 @@
             document.getElementById('mlaDistrict').textContent = mlaData.district_name || 'N/A';
             document.getElementById('mlaParty').textContent = mlaData.party_name || 'N/A';
 
-            // Extract email from offices array
+            // Extract email from offices array or direct email field
             let email = 'Not available';
-            if (mlaData.offices && mlaData.offices.length > 0) {
+            if (mlaData.email) {
+                email = mlaData.email;
+            } else if (mlaData.offices && mlaData.offices.length > 0) {
                 for (let office of mlaData.offices) {
                     if (office.email) {
                         email = office.email;
