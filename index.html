@@ -745,6 +745,7 @@
         }
 
         async function searchByPostalCode(postalCode) {
+            console.log('Searching by postal code:', postalCode);
             const response = await fetch(`https://represent.opennorth.ca/postcodes/${postalCode}/`);
 
             if (!response.ok) {
@@ -752,10 +753,15 @@
             }
 
             const data = await response.json();
+            console.log('Postal code API response:', data);
+
             const allReps = data.representatives_centroid || data.representatives_concordance || [];
+            console.log('All representatives from postal code:', allReps);
 
             // Filter for BC MLAs only (elected_office === "MLA")
             const mlas = allReps.filter(rep => rep.elected_office === 'MLA');
+            console.log('Filtered MLAs:', mlas);
+
             return mlas;
         }
 
