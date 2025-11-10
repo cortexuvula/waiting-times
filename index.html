@@ -451,17 +451,48 @@
                 const item = document.createElement('div');
                 item.className = 'autocomplete-item';
 
-                const displayName = suggestion.display_name;
-                const parts = displayName.split(', ');
-                const mainAddress = parts.slice(0, 2).join(', ');
-                const subAddress = parts.slice(2).join(', ');
+                // Format address using structured components if available
+                let mainAddress = '';
+                let subAddress = '';
+
+                if (suggestion.address) {
+                    const addr = suggestion.address;
+
+                    // Build main address line (street address)
+                    const streetParts = [];
+                    if (addr.house_number) streetParts.push(addr.house_number);
+                    if (addr.road) streetParts.push(addr.road);
+                    mainAddress = streetParts.join(' ');
+
+                    // Build sub address line (city, province, postal code)
+                    const locationParts = [];
+                    const city = addr.city || addr.town || addr.village || addr.municipality;
+                    if (city) locationParts.push(city);
+
+                    const province = addr.state || addr.province;
+                    if (province) {
+                        // Abbreviate British Columbia to BC
+                        locationParts.push(province === 'British Columbia' ? 'BC' : province);
+                    }
+
+                    if (addr.postcode) locationParts.push(addr.postcode);
+                    subAddress = locationParts.join(', ');
+                }
+
+                // Fallback to display_name if structured address is not available
+                if (!mainAddress) {
+                    const displayName = suggestion.display_name;
+                    const parts = displayName.split(', ');
+                    mainAddress = parts.slice(0, 2).join(', ');
+                    subAddress = parts.slice(2, 5).join(', ');
+                }
 
                 item.innerHTML = `
                     <strong>${mainAddress}</strong>
                     <small>${subAddress}</small>
                 `;
 
-                item.addEventListener('click', () => selectSuggestion(suggestion));
+                item.addEventListener('click', () => selectSuggestion(suggestion, mainAddress, subAddress));
                 item.addEventListener('mouseenter', () => {
                     selectedSuggestionIndex = index;
                     updateSelectedSuggestion(suggestionsContainer.querySelectorAll('.autocomplete-item'));
@@ -484,8 +515,30 @@
             });
         }
 
-        function selectSuggestion(suggestion) {
-            addressInput.value = suggestion.display_name;
+        function selectSuggestion(suggestion, mainAddress, subAddress) {
+            // If mainAddress and subAddress are provided, use them; otherwise format from suggestion
+            if (mainAddress && subAddress) {
+                addressInput.value = `${mainAddress}, ${subAddress}`;
+            } else if (suggestion.address) {
+                // Format from suggestion.address
+                const addr = suggestion.address;
+                const streetParts = [];
+                if (addr.house_number) streetParts.push(addr.house_number);
+                if (addr.road) streetParts.push(addr.road);
+                const street = streetParts.join(' ');
+
+                const locationParts = [];
+                const city = addr.city || addr.town || addr.village || addr.municipality;
+                if (city) locationParts.push(city);
+                const province = addr.state || addr.province;
+                if (province) locationParts.push(province === 'British Columbia' ? 'BC' : province);
+                if (addr.postcode) locationParts.push(addr.postcode);
+
+                addressInput.value = `${street}, ${locationParts.join(', ')}`;
+            } else {
+                // Fallback to display_name
+                addressInput.value = suggestion.display_name;
+            }
             hideSuggestions();
         }
 
