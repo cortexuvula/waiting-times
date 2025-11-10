@@ -464,7 +464,7 @@
                     if (addr.road) streetParts.push(addr.road);
                     mainAddress = streetParts.join(' ');
 
-                    // Build sub address line (city, province, postal code)
+                    // Build sub address line (city, province only - postal codes may be inaccurate)
                     const locationParts = [];
                     const city = addr.city || addr.town || addr.village || addr.municipality;
                     if (city) locationParts.push(city);
@@ -475,7 +475,6 @@
                         locationParts.push(province === 'British Columbia' ? 'BC' : province);
                     }
 
-                    if (addr.postcode) locationParts.push(addr.postcode);
                     subAddress = locationParts.join(', ');
                 }
 
@@ -532,7 +531,6 @@
                 if (city) locationParts.push(city);
                 const province = addr.state || addr.province;
                 if (province) locationParts.push(province === 'British Columbia' ? 'BC' : province);
-                if (addr.postcode) locationParts.push(addr.postcode);
 
                 addressInput.value = `${street}, ${locationParts.join(', ')}`;
             } else {
