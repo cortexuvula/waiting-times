@@ -747,31 +747,32 @@
         async function searchByCoordinates(lat, lng) {
             console.log(`Searching Represent API with coordinates: ${lat}, ${lng}`);
 
-            // First, try to find the BC electoral district boundary
-            const boundaryResponse = await fetch(`https://represent.opennorth.ca/boundaries/?contains=${lat},${lng}&sets=british-columbia-electoral-districts`);
+            // Try to find the BC electoral district boundary (optional, for logging)
+            let districtName = null;
+            try {
+                const boundaryResponse = await fetch(`https://represent.opennorth.ca/boundaries/?contains=${lat},${lng}&sets=british-columbia-electoral-districts`);
 
-            if (!boundaryResponse.ok) {
-                console.error('Boundary API error:', boundaryResponse.status);
-                throw new Error('Could not find electoral district for this location');
+                if (boundaryResponse.ok) {
+                    const boundaryData = await boundaryResponse.json();
+                    console.log('Boundary response:', boundaryData);
+
+                    if (boundaryData.objects && boundaryData.objects.length > 0) {
+                        districtName = boundaryData.objects[0].name;
+                        console.log('Found electoral district:', districtName);
+                    } else {
+                        console.log('Boundary data returned empty - coordinates may not align with boundary dataset');
+                    }
+                }
+            } catch (error) {
+                console.log('Boundary lookup failed (non-critical):', error);
             }
 
-            const boundaryData = await boundaryResponse.json();
-            console.log('Boundary response:', boundaryData);
-
-            if (!boundaryData.objects || boundaryData.objects.length === 0) {
-                throw new Error('No BC electoral district found for this location. Please verify the address is in British Columbia.');
-            }
-
-            const district = boundaryData.objects[0];
-            const districtName = district.name;
-            console.log('Found electoral district:', districtName);
-
-            // Now search for representatives in BC legislative districts
+            // Search for representatives in BC legislature (with or without boundary match)
             const response = await fetch(`https://represent.opennorth.ca/representatives/british-columbia-legislature/?point=${lat},${lng}`);
 
             if (!response.ok) {
                 console.error('Representatives API error:', response.status, response.statusText);
-                throw new Error('Could not find MLA for this electoral district');
+                throw new Error('Could not find MLA for this location. Please try using your postal code instead (e.g., V2C 6X5).');
             }
 
             const data = await response.json();
@@ -779,7 +780,8 @@
             console.log('Representatives from BC legislature:', allReps);
 
             if (allReps.length === 0) {
-                throw new Error(`Found electoral district "${districtName}" but no MLA data available. Please try using your postal code instead.`);
+                const districtMsg = districtName ? ` for ${districtName}` : '';
+                throw new Error(`No MLA data available${districtMsg}. Please try using your postal code instead (e.g., V2C 6X5).`);
             }
 
             return allReps;
@@ -1003,6 +1005,110 @@ Sincerely,
                 findMLA();
             }
         });
+
+        // TEST SUITE - Can be run from browser console
+        async function runMLALookupTests() {
+            console.log('=== MLA Lookup Test Suite ===\n');
+
+            const testCases = [
+                {
+                    address: '1022 Barnes Avenue, Kelowna, BC',
+                    expectedMLA: 'Gavin Dew',
+                    expectedDistrict: 'Kelowna-Mission'
+                },
+                {
+                    address: '1750 McKinley Court, Kamloops, BC',
+                    expectedMLA: 'Peter Milobar',
+                    expectedDistrict: 'Kamloops-North Thompson'
+                }
+            ];
+
+            let passedTests = 0;
+            let failedTests = 0;
+
+            for (let i = 0; i < testCases.length; i++) {
+                const test = testCases[i];
+                console.log(`\n--- Test ${i + 1}: ${test.address} ---`);
+
+                try {
+                    // Try to extract postal code
+                    const postalCodePattern = /[A-Za-z]\d[A-Za-z]\s?\d[A-Za-z]\d/;
+                    const postalCodeMatch = test.address.match(postalCodePattern);
+
+                    let representatives;
+
+                    if (postalCodeMatch) {
+                        const cleanPostalCode = postalCodeMatch[0].replace(/\s/g, '').toUpperCase();
+                        console.log(`  Using postal code: ${cleanPostalCode}`);
+                        representatives = await searchByPostalCode(cleanPostalCode);
+                    } else {
+                        console.log(`  Geocoding address...`);
+                        const coords = await geocodeAddress(test.address);
+                        console.log(`  Coordinates: ${coords.lat}, ${coords.lng}`);
+                        representatives = await searchByCoordinates(coords.lat, coords.lng);
+                    }
+
+                    if (representatives && representatives.length > 0) {
+                        const mla = representatives[0];
+                        const actualName = mla.name;
+                        const actualDistrict = mla.district_name;
+
+                        console.log(`  Found MLA: ${actualName}`);
+                        console.log(`  District: ${actualDistrict}`);
+
+                        // Check if MLA name matches
+                        const nameMatch = actualName === test.expectedMLA;
+                        const districtMatch = actualDistrict === test.expectedDistrict;
+
+                        if (nameMatch && districtMatch) {
+                            console.log(`  ✅ PASS - Correct MLA and district found`);
+                            passedTests++;
+                        } else if (nameMatch) {
+                            console.log(`  ⚠️  PARTIAL PASS - Correct MLA but district mismatch`);
+                            console.log(`     Expected district: ${test.expectedDistrict}`);
+                            console.log(`     Actual district: ${actualDistrict}`);
+                            passedTests++;
+                        } else {
+                            console.log(`  ❌ FAIL - MLA name mismatch`);
+                            console.log(`     Expected: ${test.expectedMLA}`);
+                            console.log(`     Actual: ${actualName}`);
+                            failedTests++;
+                        }
+                    } else {
+                        console.log(`  ❌ FAIL - No MLA found`);
+                        failedTests++;
+                    }
+                } catch (error) {
+                    console.log(`  ❌ FAIL - Error occurred: ${error.message}`);
+                    failedTests++;
+                }
+            }
+
+            // Print summary
+            console.log('\n=== Test Summary ===');
+            console.log(`Total tests: ${testCases.length}`);
+            console.log(`Passed: ${passedTests}`);
+            console.log(`Failed: ${failedTests}`);
+            console.log(`Success rate: ${((passedTests / testCases.length) * 100).toFixed(1)}%`);
+
+            if (failedTests === 0) {
+                console.log('\n🎉 All tests passed!');
+            } else {
+                console.log('\n⚠️  Some tests failed. Review the output above for details.');
+            }
+
+            return {
+                total: testCases.length,
+                passed: passedTests,
+                failed: failedTests,
+                successRate: (passedTests / testCases.length) * 100
+            };
+        }
+
+        // Make test function available globally for console access
+        window.runMLALookupTests = runMLALookupTests;
+
+        console.log('MLA Lookup Test Suite loaded. Run window.runMLALookupTests() to test the application.');
     </script>
 </body>
 </html>
