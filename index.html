@@ -758,6 +758,12 @@
             const allReps = data.representatives_centroid || data.representatives_concordance || [];
             console.log('All representatives from postal code:', allReps);
 
+            // Log the elected_office values to debug filtering
+            if (allReps.length > 0) {
+                console.log('Sample representative:', allReps[0]);
+                console.log('Elected office values:', allReps.map(rep => rep.elected_office));
+            }
+
             // Filter for BC MLAs only (elected_office === "MLA")
             const mlas = allReps.filter(rep => rep.elected_office === 'MLA');
             console.log('Filtered MLAs:', mlas);
