@@ -768,7 +768,17 @@
             const mlas = allReps.filter(rep => rep.elected_office === 'MLA');
             console.log('Filtered MLAs:', mlas);
 
-            // If no MLAs found, throw an error to trigger coordinate fallback
+            // If no MLAs found, try using the postal code's centroid coordinates
+            if (mlas.length === 0 && data.centroid && data.centroid.coordinates) {
+                const [lng, lat] = data.centroid.coordinates;
+                console.log(`No MLAs in postal code data, trying centroid coordinates: ${lat}, ${lng}`);
+                const centroidReps = await searchByCoordinates(lat, lng);
+                if (centroidReps && centroidReps.length > 0) {
+                    return centroidReps;
+                }
+                throw new Error('No MLAs found for this postal code (found only federal/municipal representatives)');
+            }
+
             if (mlas.length === 0) {
                 throw new Error('No MLAs found for this postal code (found only federal/municipal representatives)');
             }
