@@ -746,31 +746,43 @@
 
         async function searchByCoordinates(lat, lng) {
             console.log(`Searching Represent API with coordinates: ${lat}, ${lng}`);
-            const response = await fetch(`https://represent.opennorth.ca/representatives/?point=${lat},${lng}`);
+
+            // First, try to find the BC electoral district boundary
+            const boundaryResponse = await fetch(`https://represent.opennorth.ca/boundaries/?contains=${lat},${lng}&sets=british-columbia-electoral-districts`);
+
+            if (!boundaryResponse.ok) {
+                console.error('Boundary API error:', boundaryResponse.status);
+                throw new Error('Could not find electoral district for this location');
+            }
+
+            const boundaryData = await boundaryResponse.json();
+            console.log('Boundary response:', boundaryData);
+
+            if (!boundaryData.objects || boundaryData.objects.length === 0) {
+                throw new Error('No BC electoral district found for this location. Please verify the address is in British Columbia.');
+            }
+
+            const district = boundaryData.objects[0];
+            const districtName = district.name;
+            console.log('Found electoral district:', districtName);
+
+            // Now search for representatives in BC legislative districts
+            const response = await fetch(`https://represent.opennorth.ca/representatives/british-columbia-legislature/?point=${lat},${lng}`);
 
             if (!response.ok) {
-                console.error('Represent API error:', response.status, response.statusText);
-                throw new Error('Could not find MLA for this location');
+                console.error('Representatives API error:', response.status, response.statusText);
+                throw new Error('Could not find MLA for this electoral district');
             }
 
             const data = await response.json();
             const allReps = data.objects || [];
-            console.log('All representatives from API:', allReps);
+            console.log('Representatives from BC legislature:', allReps);
 
-            // Log all elected_office values to debug the filter
-            console.log('Elected office values:', allReps.map(rep => rep.elected_office));
-
-            // Log first representative's keys to see available fields
-            if (allReps.length > 0) {
-                console.log('First representative keys:', Object.keys(allReps[0]));
-                console.log('First representative sample:', allReps[0]);
+            if (allReps.length === 0) {
+                throw new Error(`Found electoral district "${districtName}" but no MLA data available. Please try using your postal code instead.`);
             }
 
-            // Filter for BC MLAs only (elected_office === "MLA")
-            const mlas = allReps.filter(rep => rep.elected_office === 'MLA');
-            console.log('Filtered MLAs:', mlas);
-
-            return mlas;
+            return allReps;
         }
 
         async function geocodeAddress(address) {
