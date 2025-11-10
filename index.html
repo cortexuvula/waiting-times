@@ -768,6 +768,11 @@
             const mlas = allReps.filter(rep => rep.elected_office === 'MLA');
             console.log('Filtered MLAs:', mlas);
 
+            // If no MLAs found, throw an error to trigger coordinate fallback
+            if (mlas.length === 0) {
+                throw new Error('No MLAs found for this postal code (found only federal/municipal representatives)');
+            }
+
             return mlas;
         }
 
