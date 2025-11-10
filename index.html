@@ -1005,6 +1005,110 @@ Sincerely,
                 findMLA();
             }
         });
+
+        // TEST SUITE - Can be run from browser console
+        async function runMLALookupTests() {
+            console.log('=== MLA Lookup Test Suite ===\n');
+
+            const testCases = [
+                {
+                    address: '1022 Barnes Avenue, Kelowna, BC',
+                    expectedMLA: 'Gavin Dew',
+                    expectedDistrict: 'Kelowna-Mission'
+                },
+                {
+                    address: '1750 McKinley Court, Kamloops, BC',
+                    expectedMLA: 'Peter Milobar',
+                    expectedDistrict: 'Kamloops-North Thompson'
+                }
+            ];
+
+            let passedTests = 0;
+            let failedTests = 0;
+
+            for (let i = 0; i < testCases.length; i++) {
+                const test = testCases[i];
+                console.log(`\n--- Test ${i + 1}: ${test.address} ---`);
+
+                try {
+                    // Try to extract postal code
+                    const postalCodePattern = /[A-Za-z]\d[A-Za-z]\s?\d[A-Za-z]\d/;
+                    const postalCodeMatch = test.address.match(postalCodePattern);
+
+                    let representatives;
+
+                    if (postalCodeMatch) {
+                        const cleanPostalCode = postalCodeMatch[0].replace(/\s/g, '').toUpperCase();
+                        console.log(`  Using postal code: ${cleanPostalCode}`);
+                        representatives = await searchByPostalCode(cleanPostalCode);
+                    } else {
+                        console.log(`  Geocoding address...`);
+                        const coords = await geocodeAddress(test.address);
+                        console.log(`  Coordinates: ${coords.lat}, ${coords.lng}`);
+                        representatives = await searchByCoordinates(coords.lat, coords.lng);
+                    }
+
+                    if (representatives && representatives.length > 0) {
+                        const mla = representatives[0];
+                        const actualName = mla.name;
+                        const actualDistrict = mla.district_name;
+
+                        console.log(`  Found MLA: ${actualName}`);
+                        console.log(`  District: ${actualDistrict}`);
+
+                        // Check if MLA name matches
+                        const nameMatch = actualName === test.expectedMLA;
+                        const districtMatch = actualDistrict === test.expectedDistrict;
+
+                        if (nameMatch && districtMatch) {
+                            console.log(`  ✅ PASS - Correct MLA and district found`);
+                            passedTests++;
+                        } else if (nameMatch) {
+                            console.log(`  ⚠️  PARTIAL PASS - Correct MLA but district mismatch`);
+                            console.log(`     Expected district: ${test.expectedDistrict}`);
+                            console.log(`     Actual district: ${actualDistrict}`);
+                            passedTests++;
+                        } else {
+                            console.log(`  ❌ FAIL - MLA name mismatch`);
+                            console.log(`     Expected: ${test.expectedMLA}`);
+                            console.log(`     Actual: ${actualName}`);
+                            failedTests++;
+                        }
+                    } else {
+                        console.log(`  ❌ FAIL - No MLA found`);
+                        failedTests++;
+                    }
+                } catch (error) {
+                    console.log(`  ❌ FAIL - Error occurred: ${error.message}`);
+                    failedTests++;
+                }
+            }
+
+            // Print summary
+            console.log('\n=== Test Summary ===');
+            console.log(`Total tests: ${testCases.length}`);
+            console.log(`Passed: ${passedTests}`);
+            console.log(`Failed: ${failedTests}`);
+            console.log(`Success rate: ${((passedTests / testCases.length) * 100).toFixed(1)}%`);
+
+            if (failedTests === 0) {
+                console.log('\n🎉 All tests passed!');
+            } else {
+                console.log('\n⚠️  Some tests failed. Review the output above for details.');
+            }
+
+            return {
+                total: testCases.length,
+                passed: passedTests,
+                failed: failedTests,
+                successRate: (passedTests / testCases.length) * 100
+            };
+        }
+
+        // Make test function available globally for console access
+        window.runMLALookupTests = runMLALookupTests;
+
+        console.log('MLA Lookup Test Suite loaded. Run window.runMLALookupTests() to test the application.');
     </script>
 </body>
 </html>
