@@ -757,6 +757,15 @@
             const allReps = data.objects || [];
             console.log('All representatives from API:', allReps);
 
+            // Log all elected_office values to debug the filter
+            console.log('Elected office values:', allReps.map(rep => rep.elected_office));
+
+            // Log first representative's keys to see available fields
+            if (allReps.length > 0) {
+                console.log('First representative keys:', Object.keys(allReps[0]));
+                console.log('First representative sample:', allReps[0]);
+            }
+
             // Filter for BC MLAs only (elected_office === "MLA")
             const mlas = allReps.filter(rep => rep.elected_office === 'MLA');
             console.log('Filtered MLAs:', mlas);
